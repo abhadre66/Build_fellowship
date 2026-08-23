@@ -65,8 +65,8 @@ const endRound = (code) => {
   const lobby = lobbies.get(code);
   if (!lobby || !lobby.round) return;
   clearRoundTimer(code);
-  const word = lobby.endRound();
-  const payload = { word, players: lobby.players.map(({ id, name, score }) => ({ id, name, score })) };
+  const { word, artistBonus, artistName } = lobby.endRound();
+  const payload = { word, artistBonus, artistName, players: lobby.players.map(({ id, name, score }) => ({ id, name, score })) };
   io.to(code).emit(lobby.status === 'game-ended' ? 'game-ended' : 'round-ended', payload);
   broadcast(code);
 };

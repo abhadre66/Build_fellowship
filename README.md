@@ -10,7 +10,7 @@ A real-time multiplayer drawing game — one player draws, everyone else races t
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev)
 [![Node](https://img.shields.io/badge/Node-18+-5FA04E?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-4-010101?style=flat-square&logo=socketdotio&logoColor=white)](https://socket.io)
-[![Tests](https://img.shields.io/badge/tests-10%20passing-2dd4a7?style=flat-square)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-13%20passing-2dd4a7?style=flat-square)](#-testing)
 [![License](https://img.shields.io/badge/license-MIT-a78bfa?style=flat-square)](LICENSE)
 
 <br>
@@ -44,12 +44,13 @@ Open **http://localhost:5173** in two browser tabs — create a room in one, pas
 | | | |
 |:--|:--|:--|
 | **1** | **Someone creates a room** | You get a six-character code to share. Anyone with it can join. |
-| **2** | **The host starts the game** | The server picks an artist and a secret word, then starts a 60-second clock. |
+| **2** | **The host starts the game** | The server shuffles a turn order so everyone draws exactly once, then picks a secret word and starts a 60-second clock. |
 | **3** | **The artist draws** | Seven colours, three pencil weights, an eraser. Every stroke streams to the room as it happens. |
 | **4** | **Everyone else guesses** | Correct guesses score `time remaining × 10`. Wrong guesses stay private — no accidental spoilers. |
-| **5** | **The round closes** | On the timer, or **the instant everyone has solved it**. Then the next artist is up. |
+| **5** | **The artist scores too** | They earn the **average of what the solvers scored**, so drawing clearly is worth as much as guessing fast. Nobody guesses, nobody earns. |
+| **6** | **The round closes** | On the timer, or **the instant everyone has solved it**. Then the next artist is up. |
 
-Five rounds per game, 2–8 players, and a 30-word pool that won't repeat a word until it's been through the whole list.
+One round per player, 2–8 players, and a 30-word pool that won't repeat a word until it's been through the whole list. A game is over once everyone has had the pen.
 
 <br>
 
@@ -140,7 +141,7 @@ The important part: **the client never decides anything.** It renders what the s
 | Class | Responsibility |
 |:--|:--|
 | **`Lobby`** | The room. Holds players and the current round; decides when a round ends versus when the whole game does. |
-| **`Round`** | One turn. Picks the artist and a word not yet used this game, tracks who has solved it, reports time remaining. |
+| **`Round`** | One turn. Holds the artist, a word not yet used this game, who has solved it, and what they scored. |
 | **`Player`** | Identity, score, host flag, and a `connected` flag — the last one is what makes reconnects survivable. |
 | **`CanvasState`** | The stroke log for the round, so anyone joining or reconnecting mid-draw sees the drawing already in progress. |
 
@@ -213,12 +214,16 @@ Things that only matter once actual people are in the room:
 npm test
 ```
 
-Ten Vitest tests aimed at the **game rules** rather than the plumbing:
+Thirteen Vitest tests aimed at the **game rules** rather than the plumbing:
 
 - ✅ Scoring on a correct guess
 - ✅ The artist can't guess their own word
 - ✅ No double-scoring from one player
 - ✅ Every non-artist solving it flags the round to end early
+- ✅ **Every player draws exactly once, then the game ends**
+- ✅ **A player who leaves is skipped rather than stranding the round**
+- ✅ **The artist earns the average of the solvers' points**
+- ✅ **The artist earns nothing when nobody guesses**
 - ✅ The word pool doesn't repeat until exhausted
 - ✅ Round-end versus game-end transitions
 - ✅ Host promotion when the host leaves

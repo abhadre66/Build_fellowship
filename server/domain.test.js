@@ -19,11 +19,21 @@ describe('Lobby.startRound', () => {
     expect(lobby.players.some((player) => player.id === round.artistId)).toBe(true);
   });
 
-  it('refuses to start once maxRounds is reached', () => {
-    const lobby = makeLobby();
-    lobby.maxRounds = 1;
-    lobby.startRound();
+  it('gives every player exactly one turn, then ends the game', () => {
+    const lobby = makeLobby(4);
+    const artists = [];
+    for (let i = 0; i < 4; i += 1) artists.push(lobby.startRound().artistId);
+    expect(new Set(artists).size).toBe(4);
+    expect(artists.sort()).toEqual(['p0', 'p1', 'p2', 'p3']);
     expect(lobby.startRound()).toBeNull();
+  });
+
+  it('skips a player who left rather than stranding the round', () => {
+    const lobby = makeLobby(3);
+    const first = lobby.startRound().artistId;
+    const remaining = lobby.players.filter((player) => player.id !== first);
+    lobby.removePlayer(remaining[0].id);
+    expect(lobby.startRound().artistId).toBe(remaining[1].id);
   });
 });
 
@@ -77,17 +87,17 @@ describe('Round word selection', () => {
 });
 
 describe('Lobby.endRound', () => {
-  it('moves to round-ended while rounds remain', () => {
-    const lobby = makeLobby();
-    lobby.maxRounds = 3;
+  it('moves to round-ended while players still have turns', () => {
+    const lobby = makeLobby(3);
     lobby.startRound();
     lobby.endRound();
     expect(lobby.status).toBe('round-ended');
   });
 
-  it('moves to game-ended after the final round', () => {
-    const lobby = makeLobby();
-    lobby.maxRounds = 1;
+  it('moves to game-ended once everyone has drawn', () => {
+    const lobby = makeLobby(2);
+    lobby.startRound();
+    lobby.endRound();
     lobby.startRound();
     lobby.endRound();
     expect(lobby.status).toBe('game-ended');
@@ -100,5 +110,26 @@ describe('Lobby.removePlayer', () => {
     lobby.removePlayer('p0');
     expect(lobby.players).toHaveLength(2);
     expect(lobby.players.some((player) => player.isHost)).toBe(true);
+  });
+});
+
+describe('artist scoring', () => {
+  it('awards the artist the average of what the solvers scored', () => {
+    const lobby = makeLobby(3);
+    const round = lobby.startRound();
+    const guessers = lobby.players.filter((player) => player.id !== round.artistId);
+    guessers.forEach((player) => lobby.guess(player.id, round.word));
+    const expected = Math.round(guessers.reduce((sum, player) => sum + player.score, 0) / guessers.length);
+    const result = lobby.endRound();
+    expect(result.artistBonus).toBe(expected);
+    expect(lobby.players.find((player) => player.id === round.artistId).score).toBe(expected);
+  });
+
+  it('gives the artist nothing when nobody guesses', () => {
+    const lobby = makeLobby(3);
+    const round = lobby.startRound();
+    const result = lobby.endRound();
+    expect(result.artistBonus).toBe(0);
+    expect(lobby.players.find((player) => player.id === round.artistId).score).toBe(0);
   });
 });
