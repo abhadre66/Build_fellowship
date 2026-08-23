@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: sketch-and-guess
+    runtime: node
+    plan: free
+    # --include=dev so vite and cross-env are installed even when the host
+    # sets NODE_ENV=production during install.
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # Set this to the service's own URL after the first deploy to lock down
+      # CORS. Left unset, the server accepts any origin.
+      - key: CLIENT_ORIGIN
+        sync: false

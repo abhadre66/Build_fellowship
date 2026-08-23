@@ -1,5 +1,6 @@
 import cors from 'cors';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -18,12 +19,19 @@ const roundTimers = new Map();
 const disconnectTimers = new Map();
 const DISCONNECT_GRACE_MS = 30_000;
 
+// Behind a host's proxy the client IP arrives in X-Forwarded-For; without this every
+// visitor would share one rate-limit bucket keyed to the proxy.
+if (process.env.NODE_ENV === 'production' || process.env.RENDER) app.set('trust proxy', 1);
+
 app.use(cors({ origin: allowedOrigin }));
 app.use(express.json());
-app.use(rateLimit({ windowMs: 60_000, max: 20, standardHeaders: true, legacyHeaders: false }));
+
+// Scoped to /api so it never counts the client's own static assets.
+const limit = (max) => rateLimit({ windowMs: 60_000, max, standardHeaders: true, legacyHeaders: false });
+app.use('/api', limit(120));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
-app.post('/api/lobbies', (req, res) => {
+app.post('/api/lobbies', limit(20), (req, res) => {
   const name = String(req.body.name || '').trim().slice(0, 18);
   if (!name) return res.status(400).json({ error: 'A nickname is required.' });
   let code = makeCode();
@@ -130,8 +138,10 @@ io.on('connection', (socket) => {
   });
 });
 
+// Serve the built client whenever a build is present, rather than keying off
+// NODE_ENV — a deploy that builds should serve, however the host sets its env.
 const distPath = path.join(__dirname, '..', 'dist');
-if (process.env.NODE_ENV === 'production') {
+if (existsSync(path.join(distPath, 'index.html'))) {
   app.use(express.static(distPath));
   app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
 }

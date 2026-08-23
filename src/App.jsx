@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const socket = io(API, { autoConnect: false });
+// In production the API is served from the same origin as the client, so the base
+// is empty. Only dev needs to reach across to the separate API port.
+const API = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:3001' : '');
+const socket = API ? io(API, { autoConnect: false }) : io({ autoConnect: false });
 const SESSION_KEY = 'sketch-and-guess-session';
 
 const loadSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; } };
