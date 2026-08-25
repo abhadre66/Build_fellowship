@@ -133,3 +133,33 @@ describe('artist scoring', () => {
     expect(lobby.players.find((player) => player.id === round.artistId).score).toBe(0);
   });
 });
+
+describe('turn handover', () => {
+  it('names who is up next without consuming their turn', () => {
+    const lobby = makeLobby(3);
+    const first = lobby.startRound().artistId;
+    lobby.endRound();
+    const upNext = lobby.peekNextTurn();
+    expect(upNext.id).not.toBe(first);
+    // Peeking must not advance anything — the same player is still up.
+    expect(lobby.peekNextTurn().id).toBe(upNext.id);
+    expect(lobby.startRound().artistId).toBe(upNext.id);
+  });
+
+  it('reports nobody up next once the last turn is taken', () => {
+    const lobby = makeLobby(2);
+    lobby.startRound(); lobby.endRound();
+    lobby.startRound(); lobby.endRound();
+    expect(lobby.peekNextTurn()).toBeNull();
+  });
+
+  it('ends the game when leaving drops the room below two players', () => {
+    const lobby = makeLobby(3);
+    const round = lobby.startRound();
+    const others = lobby.players.filter((player) => player.id !== round.artistId);
+    lobby.removePlayer(others[0].id);
+    lobby.removePlayer(others[1].id);
+    lobby.endRound();
+    expect(lobby.status).toBe('game-ended');
+  });
+});

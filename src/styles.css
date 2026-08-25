@@ -89,6 +89,12 @@ button { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease,
   border: 1px solid var(--line); background: var(--paper); color: var(--muted);
 }
 .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.leave-button {
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--paper); color: var(--muted);
+  font: 600 12px 'Nunito', sans-serif; letter-spacing: .02em; cursor: pointer;
+}
+.leave-button:hover { border-color: var(--danger, #ff6b6b); color: var(--danger, #ff6b6b); }
 .eyebrow, .section-title, .timer span, label, .fine-print, .room-chip span {
   font: 600 11px 'DM Mono', monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
 }

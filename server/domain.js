@@ -77,21 +77,29 @@ export class Lobby {
       round: this.round ? { number: this.round.number, artistId: this.round.artistId, remaining: this.round.getRemaining(), solvedCount: this.round.solvedBy.length } : null,
       strokes: this.canvas.strokes,
       maxRounds: this.turnOrder.length || this.players.length,
+      nextArtistId: this.peekNextTurn()?.id ?? null,
     };
   }
-  // A turn only counts if that player is still in the room, so someone leaving
-  // mid-game shortens the game rather than stranding it on a missing artist.
-  canStartRound() {
-    if (this.turnOrder.length === 0) return this.players.length >= 2;
-    return this.turnOrder.slice(this.turnIndex + 1).some((id) => this.players.some((player) => player.id === id));
-  }
-  nextArtistId() {
-    while (this.turnIndex + 1 < this.turnOrder.length) {
-      this.turnIndex += 1;
-      const id = this.turnOrder[this.turnIndex];
-      if (this.players.some((player) => player.id === id)) return id;
+  // Who takes the pen next, without consuming the turn. A turn only counts if that
+  // player is still in the room, so someone leaving shortens the game rather than
+  // stranding it — and the reveal screen can name them before the round starts.
+  peekNextTurn() {
+    for (let i = this.turnIndex + 1; i < this.turnOrder.length; i += 1) {
+      const id = this.turnOrder[i];
+      if (this.players.some((player) => player.id === id)) return { index: i, id };
     }
     return null;
+  }
+  nextArtistId() {
+    const next = this.peekNextTurn();
+    if (!next) return null;
+    this.turnIndex = next.index;
+    return next.id;
+  }
+  canStartRound() {
+    if (this.players.length < 2) return false;
+    if (this.turnOrder.length === 0) return true;
+    return this.peekNextTurn() !== null;
   }
   startRound() {
     if (!this.canStartRound()) return null;

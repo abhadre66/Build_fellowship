@@ -66,7 +66,15 @@ const endRound = (code) => {
   if (!lobby || !lobby.round) return;
   clearRoundTimer(code);
   const { word, artistBonus, artistName } = lobby.endRound();
-  const payload = { word, artistBonus, artistName, players: lobby.players.map(({ id, name, score }) => ({ id, name, score })) };
+  const next = lobby.peekNextTurn();
+  const nextArtist = next && lobby.players.find((item) => item.id === next.id);
+  const payload = {
+    word, artistBonus, artistName,
+    nextArtistId: nextArtist?.id ?? null,
+    nextArtistName: nextArtist?.name ?? null,
+    nextArtistConnected: nextArtist?.connected ?? false,
+    players: lobby.players.map(({ id, name, score }) => ({ id, name, score })),
+  };
   io.to(code).emit(lobby.status === 'game-ended' ? 'game-ended' : 'round-ended', payload);
   broadcast(code);
 };
@@ -120,8 +128,31 @@ io.on('connection', (socket) => {
   socket.on('next-round', () => {
     const lobby = lobbies.get(socket.data.code);
     const player = lobby?.players.find((item) => item.id === socket.data.playerId);
-    if (!lobby || !player?.isHost) return;
+    if (!lobby || !player) return;
+    const next = lobby.peekNextTurn();
+    const isNextArtist = next?.id === player.id;
+    const nextArtist = next && lobby.players.find((item) => item.id === next.id);
+    // The host can only step in when the player who is up has dropped offline.
+    const hostRescuing = player.isHost && !!nextArtist && !nextArtist.connected;
+    if (!isNextArtist && !hostRescuing) return;
     beginRound(lobby);
+  });
+
+  socket.on('leave-room', () => {
+    const { code, playerId } = socket.data;
+    const lobby = lobbies.get(code);
+    if (!lobby) return;
+    clearTimeout(disconnectTimers.get(`${code}:${playerId}`));
+    disconnectTimers.delete(`${code}:${playerId}`);
+    const wasArtist = lobby.round?.artistId === playerId && lobby.status === 'playing';
+    lobby.removePlayer(playerId);
+    socket.leave(code);
+    socket.data.code = null;
+    socket.data.playerId = null;
+    if (lobby.players.length === 0) { clearRoundTimer(code); lobbies.delete(code); return; }
+    // Nobody is holding the pen any more, so the round cannot continue.
+    if (wasArtist) return endRound(code);
+    broadcast(code);
   });
   socket.on('disconnect', () => {
     const { code, playerId } = socket.data;
